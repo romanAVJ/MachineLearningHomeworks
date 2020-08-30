@@ -1,0 +1,199 @@
+---
+title: "Tarea1: LDA"
+subtitle: "Román Alverto Vélez Jiménez CU 165462"
+output: html_notebook
+---
+```{r}
+library(tidyverse)
+#Agregué los valores de entrenamiento y prueba con una semilla para comparar resultados
+
+smp_size <- floor(0.8 * nrow(iris))
+set.seed(123)
+train_ind <- sample(seq_len(nrow(iris)), size = smp_size)
+
+train_data <- data.frame(iris[train_ind, ])
+test_data <- data.frame(iris[-train_ind, ]) %>% dplyr::select(1:4)
+```
+
+# Clasificación de las iris de Fisher 
+
+El objetivo principal es _discriminar_ las clases de distintas iris de la mejor manera vía el método de aprendizaje estadístico de discriminante lineal.
+
+Los datos están dados por la siguiente tabla
+
+```{r}
+# load iris data
+iris %>% head() %>% knitr::kable()
+
+
+
+```
+
+
+## Subtarea 1: Probabilidades a priori de las clases
+
+Primero obtendremos $\hat\pi_{k}$, la probabilidad a priori de cada clase
+
+```{r function_apriori}
+# function that estimates the apriori probability 
+apriori <- function(df, column, class.name){
+  pi.k <- mean(df[column] == class.name) 
+  return(pi.k)
+}
+```
+
+Veamos como se distribuyen los casos
+```{r}
+iris %>% count(Species) %>% knitr::kable()
+
+```
+
+## Subtarea2: Estimación de la media
+En esta tarea, al suponer que $X_{k} \sim \mathcal{N}_4(\mu_k, \Sigma) \quad \forall k = 1,2,3$, encontraremos $\hat\mu_k$ vía el estimador máximo verosímil.
+
+```{r function_media}
+media <- function(df, column, class.name, vars.list){
+  # get only the data of the class to estimate
+  df.class <- df[df[,column] == class.name,]
+  
+  # get variables
+  vars.vec <- unlist(vars.list)
+  df.class <- df.class[,vars.vec]
+  
+  #estimate mean
+  mean.vec <- sapply(df.class, mean)
+  
+  return(mean.vec)
+}
+
+
+```
+
+## Subtarea3: Estimación de la covarianza
+
+
+Para calcularla, usaremos el estimador máximo verosimil insesgado de la matriz de varianzas y covarianzas:
+$$S_n = \frac{1}{n-1}\sum_{i=1}^{n}(x_i - \bar x)'(x_{i}- \bar x)$$
+
+```{r}
+var.covar <- function(df, column, class.name, vars.list){
+  # get only the data of the class to estimate
+  vars.vec <- unlist(vars.list)
+  # si filtramos por clase salen más resultados falsos por lo que creo que tienen
+  # que ser para todas las clases
+  #df.class <- df[df[,column] == class.name,]
+  #df.class <- df.class[,vars.vec]
+  df.class <- df[,vars.vec]
+  
+  # get variance
+  Sn <- cov(df.class)
+  Sn <- as.matrix(Sn)
+  return(Sn)
+}
+
+
+
+```
+
+## Subtarea4: Discriminante lineal
+En esta tarea, calcularemos
+$$\delta_{k}(x) = -\mu_k' \Sigma^{-1}x + \frac{1}{2}\mu_k' \Sigma^{-1} \mu_k - \ln(\pi_k)$$
+
+
+```{r}
+delta <- function(x, apriori.k, mean.k, var.k){
+   d = - t(x) %*% solve(var.k) %*% mean.k +
+           as.numeric(1/2* t(mean.k) %*% solve(var.k) %*% mean.k -log(apriori.k))
+          #Cambie el codigo un poco, cuando lo pruebas con un vector de una entrada funciona bien
+          #pero cuando tienes varias entradas falla por eso lo cambie como un valor númerico
+  return(as.vector(d))
+}
+
+```
+
+## Subtarea5: clasifica lineal
+Le ingresamos a la función dos Dataframes, los valores de estimación y los de entrenamiento, regresa el Dataframe de estimación con los valores de predicción.
+
+```{r}
+clasifica<-function(df,train_df){
+  
+  	
+  func_columns<-list(names(df))
+  func_test_data <- df %>% as.matrix() %>% t()
+  Predict_var <- "Species"
+  func_Predict_classes <- c("setosa","versicolor","virginica")
+  
+  
+  setosa <- delta(func_test_data,apriori(train_df,Predict_var,"setosa"),media(train_df,Predict_var,"setosa",func_columns),var.covar(train_df,Predict_var, "setosa",func_columns))
+  
+  versicolor <- delta(func_test_data,apriori(train_df,Predict_var, "versicolor"),media(train_df,Predict_var,"versicolor",func_columns),var.covar(train_df,Predict_var,"versicolor",func_columns))
+  virginica<- delta(func_test_data,apriori(train_df,Predict_var, "virginica"),media(train_df,Predict_var,"virginica",func_columns),var.covar(train_df,Predict_var,"virginica",func_columns))
+ 
+  x<-tibble("setosa"=setosa,"versicolor"=versicolor,"virginica"=virginica)
+  
+  max_by_row<-data.frame("Predict" = max.col(-x,'first'))
+  
+  
+  for (i in 1:length(func_Predict_classes)){
+    max_by_row$Predict[max_by_row$Predict == i]<-func_Predict_classes[i]
+  }
+  
+  df <- cbind(df, max_by_row)
+  return (df)
+  
+}
+
+#probar la clasificación
+clas<-clasifica(test_data[3:4],train_data)
+clas$Predict==data.frame(iris[-train_ind, ])[5]
+
+```
+
+## Tarea6
+
+```{r}
+#look if jobs 1 to 4 are ok
+# get data
+class.iris <- 'setosa'
+vars.list <- list('Sepal.Width', 'Petal.Length')
+column.data <- 'Species'
+x.setosa <- iris %>% 
+  filter(Species == class.iris) %>% 
+  select(unlist(vars.list)) %>% #get only the vars to apply
+  slice(1L) %>% #get only on observation
+  as.matrix() %>% 
+  t() #column vector
+
+#apriori
+pi.setosa <- apriori(iris, column.data, class.iris)
+
+#mean
+mean.setosa <- media(iris, column.data, class.iris, vars.list)
+
+#var
+var.setosa <- var.covar(iris, column.data, class.iris, vars.list)
+
+#lda
+delta.setosa <- delta(x.setosa, pi.setosa, mean.setosa, var.setosa)
+
+
+```
+
+
+El supuesto es que para cada clase, la matriz de varianzas y covarianzas es la misma, i.e. $\Sigma_{k} = \Sigma \quad \forall i = 1,2,3$. Este es el supuesto que vuelve lineal el discriminante.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
