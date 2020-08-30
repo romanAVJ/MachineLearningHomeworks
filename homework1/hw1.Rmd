@@ -111,7 +111,7 @@ delta <- function(x, apriori.k, mean.k, var.k){
 
 ```
 
-## Subtarea5: clasifica lineal
+## Subtarea5: Clasificación de observaciones
 Le ingresamos a la función dos Dataframes, los valores de estimación y los de entrenamiento, regresa el Dataframe de estimación con los valores de predicción.
 
 ```{r}
