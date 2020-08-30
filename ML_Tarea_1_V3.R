@@ -1,3 +1,4 @@
+
 usePackage <- function(p) 
 {
   if (!is.element(p, installed.packages()[,1]))
@@ -60,3 +61,36 @@ delta<-function(func_test_data, func_apriori, func_mean, func_var){
   
 }
 
+
+clasifica<-function(func_test_data){
+  
+  func_columns<-c(names(func_test_data))
+  Predict_var <- "Species"
+  func_Predict_classes <- c("setosa","versicolor","virginica")
+  
+  setosa <- delta(func_test_data,apriori(train_data,Predict_var, "setosa"),media(train_data,Predict_var, "setosa",func_columns),var.covar(train_data,Predict_var, "setosa",func_columns))
+  versicolor <- delta(func_test_data,apriori(train_data,Predict_var, "versicolor"),media(train_data,Predict_var, "versicolor",func_columns),var.covar(train_data,Predict_var, "versicolor",func_columns))
+  virginica<- delta(func_test_data,apriori(train_data,Predict_var, "virginica"),media(train_data,Predict_var, "virginica",func_columns),var.covar(train_data,Predict_var, "virginica",func_columns))
+  
+  x<-tibble("setosa"=setosa,"versicolor"=versicolor,"virginica"=virginica)
+  
+  max_by_row<-data.frame("Predict" = max.col(x,'first'))
+  for (i in 1:length(func_Predict_classes)){
+    max_by_row$Predict[max_by_row$Predict == i]<-func_Predict_classes[i]
+  }
+  
+  func_test_data <- cbind(func_test_data, max_by_row)
+  return (func_test_data)
+  
+}
+
+clas<-clasifica(test_data[3,4])
+clas$Predict==data.frame(iris[-train_ind, ])[5]
+
+
+##################
+
+
+lda(Species ~ ., data=train_data ) -> irisLDA
+lda.pred = predict(irisLDA,test_data)
+data.frame(lda.pred$class)==data.frame(iris[-train_ind, ])[5]
