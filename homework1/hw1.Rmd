@@ -1,7 +1,9 @@
 ---
-title: "Tarea1: LDA"
-subtitle: "Román Alverto Vélez Jiménez CU 165462"
-output: html_notebook
+title: 'Tarea1: LDA'
+subtitle: Román Alverto Vélez Jiménez CU 165462
+output:
+  html_document:
+    df_print: paged
 ---
 ```{r}
 library(tidyverse)
@@ -79,10 +81,8 @@ $$S_n = \frac{1}{n-1}\sum_{i=1}^{n}(x_i - \bar x)'(x_{i}- \bar x)$$
 var.covar <- function(df, column, class.name, vars.list){
   # get only the data of the class to estimate
   vars.vec <- unlist(vars.list)
-  # si filtramos por clase salen más resultados falsos por lo que creo que tienen
-  # que ser para todas las clases
-  #df.class <- df[df[,column] == class.name,]
-  #df.class <- df.class[,vars.vec]
+  df.class <- df[df[,column] == class.name,]
+  df.class <- df.class[,vars.vec]
   df.class <- df[,vars.vec]
   
   # get variance
@@ -97,16 +97,15 @@ var.covar <- function(df, column, class.name, vars.list){
 
 ## Subtarea4: Discriminante lineal
 En esta tarea, calcularemos
-$$\delta_{k}(x) = -\mu_k' \Sigma^{-1}x + \frac{1}{2}\mu_k' \Sigma^{-1} \mu_k - \ln(\pi_k)$$
+$$\delta_{k}(x) = x' \Sigma^{-1}\mu_k - \frac{1}{2}\mu_k' \Sigma^{-1} \mu_k + \ln(\pi_k)$$
 
 
 ```{r}
 delta <- function(x, apriori.k, mean.k, var.k){
-   d = - t(x) %*% solve(var.k) %*% mean.k +
-           as.numeric(1/2* t(mean.k) %*% solve(var.k) %*% mean.k -log(apriori.k))
-          #Cambie el codigo un poco, cuando lo pruebas con un vector de una entrada funciona bien
-          #pero cuando tienes varias entradas falla por eso lo cambie como un valor númerico
-  return(as.vector(d))
+  d =  t(x) %*% solve(var.k) %*% mean.k -
+           1/2* t(mean.k) %*% solve(var.k) %*% mean.k +
+            log(apriori.k)
+  return(d)
 }
 
 ```
@@ -120,18 +119,32 @@ clasifica<-function(df,train_df){
   	
   func_columns<-list(names(df))
   func_test_data <- df %>% as.matrix() %>% t()
+  
   Predict_var <- "Species"
   func_Predict_classes <- c("setosa","versicolor","virginica")
   
   
-  setosa <- delta(func_test_data,apriori(train_df,Predict_var,"setosa"),media(train_df,Predict_var,"setosa",func_columns),var.covar(train_df,Predict_var, "setosa",func_columns))
+  setosa <- sapply(1:ncol(func_test_data),function(i){
+  delta(func_test_data[,i], apriori(train_df,Predict_var,"setosa"), 
+        media(train_df,Predict_var,"setosa",func_columns)
+        , var.covar(train_df,Predict_var, "setosa",func_columns))
+  }) 
+  versicolor <- sapply(1:ncol(func_test_data),function(i){
+  delta(func_test_data[,i], apriori(train_df,Predict_var,"versicolor"), 
+        media(train_df,Predict_var,"versicolor",func_columns)
+        , var.covar(train_df,Predict_var, "versicolor",func_columns))
+  }) 
+  virginica <- sapply(1:ncol(func_test_data),function(i){
+  delta(func_test_data[,i], apriori(train_df,Predict_var,"virginica"), 
+        media(train_df,Predict_var,"virginica",func_columns)
+        , var.covar(train_df,Predict_var, "virginica",func_columns))
+  }) 
   
-  versicolor <- delta(func_test_data,apriori(train_df,Predict_var, "versicolor"),media(train_df,Predict_var,"versicolor",func_columns),var.covar(train_df,Predict_var,"versicolor",func_columns))
-  virginica<- delta(func_test_data,apriori(train_df,Predict_var, "virginica"),media(train_df,Predict_var,"virginica",func_columns),var.covar(train_df,Predict_var,"virginica",func_columns))
+  
  
   x<-tibble("setosa"=setosa,"versicolor"=versicolor,"virginica"=virginica)
   
-  max_by_row<-data.frame("Predict" = max.col(-x,'first'))
+  max_by_row<-data.frame("Predict" = max.col(x,'first'))
   
   
   for (i in 1:length(func_Predict_classes)){
@@ -144,7 +157,7 @@ clasifica<-function(df,train_df){
 }
 
 #probar la clasificación
-clas<-clasifica(test_data[3:4],train_data)
+clas<-clasifica(test_data[2:4],train_data)
 clas$Predict==data.frame(iris[-train_ind, ])[5]
 
 ```
@@ -177,23 +190,8 @@ var.setosa <- var.covar(iris, column.data, class.iris, vars.list)
 delta.setosa <- delta(x.setosa, pi.setosa, mean.setosa, var.setosa)
 
 
+
 ```
 
-
-El supuesto es que para cada clase, la matriz de varianzas y covarianzas es la misma, i.e. $\Sigma_{k} = \Sigma \quad \forall i = 1,2,3$. Este es el supuesto que vuelve lineal el discriminante.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+ es que para cada clase, la matriz de varianzas y covarianzas es la misma, i.e. $\Sigma_{k} = \Sigma \quad \forall i = 1,2,3$. Este es el supuesto que vuelve lineal el discriminante.
 
