@@ -1,20 +1,17 @@
 ---
 title: 'Tarea1: LDA'
-subtitle: Román Alverto Vélez Jiménez CU 165462
+subtitle: Román Alverto Vélez Jiménez CU 165462,
+          Iván Alvarez Tostado CU 167699  
 output:
   html_document:
     df_print: paged
 ---
-```{r}
+```{r message=FALSE}
 library(tidyverse)
-#Agregué los valores de entrenamiento y prueba con una semilla para comparar resultados
+library(dplyr)
 
-smp_size <- floor(0.8 * nrow(iris))
+#Ensure the replicability of the results
 set.seed(123)
-train_ind <- sample(seq_len(nrow(iris)), size = smp_size)
-
-train_data <- data.frame(iris[train_ind, ])
-test_data <- data.frame(iris[-train_ind, ]) %>% dplyr::select(1:4)
 ```
 
 # Clasificación de las iris de Fisher 
@@ -111,87 +108,177 @@ delta <- function(x, apriori.k, mean.k, var.k){
 ```
 
 ## Subtarea5: Clasificación de observaciones
-Le ingresamos a la función dos Dataframes, los valores de estimación y los de entrenamiento, regresa el Dataframe de estimación con los valores de predicción.
+Esta función clasifica una o más de una observación y tiene como parámetros un vector con variables independientes y el dataframe sobre los que se aplican las funciones apriori, media, var.covar y delta
 
 ```{r}
-clasifica<-function(df,train_df){
+clasifica<-function(X,train_df){
   
-  	
-  func_columns<-list(names(df))
-  func_test_data <- df %>% as.matrix() %>% t()
+  #Check if data is properly given
+  if (length(which(grepl(".Length", colnames(X)))) > 0 | 
+      length(which(grepl(".Width", colnames(X)))) > 0) {
+    test_df <- X %>% as.matrix() %>% t()
+  }
+
+  #Get the name of X variables in a list
+  func_columns<-list(rownames(test_df))
+  column <- "Species"
+  predict_classes <- c("setosa","versicolor","virginica")
   
-  Predict_var <- "Species"
-  func_Predict_classes <- c("setosa","versicolor","virginica")
-  
-  
-  setosa <- sapply(1:ncol(func_test_data),function(i){
-  delta(func_test_data[,i], apriori(train_df,Predict_var,"setosa"), 
-        media(train_df,Predict_var,"setosa",func_columns)
-        , var.covar(train_df,Predict_var, "setosa",func_columns))
+  #Array with delta values for "setosa"
+    setosa <- sapply(1:ncol(test_df),function(i){
+    delta(test_df[,i], apriori(train_df,column,"setosa"), 
+          media(train_df,column,"setosa",func_columns)
+          , var.covar(train_df,column, "setosa",func_columns))
   }) 
-  versicolor <- sapply(1:ncol(func_test_data),function(i){
-  delta(func_test_data[,i], apriori(train_df,Predict_var,"versicolor"), 
-        media(train_df,Predict_var,"versicolor",func_columns)
-        , var.covar(train_df,Predict_var, "versicolor",func_columns))
-  }) 
-  virginica <- sapply(1:ncol(func_test_data),function(i){
-  delta(func_test_data[,i], apriori(train_df,Predict_var,"virginica"), 
-        media(train_df,Predict_var,"virginica",func_columns)
-        , var.covar(train_df,Predict_var, "virginica",func_columns))
+    
+  #Array with delta values for "versicolor"
+   versicolor <- sapply(1:ncol(test_df),function(i){
+    delta(test_df[,i], apriori(train_df,column,"versicolor"), 
+          media(train_df,column,"versicolor",func_columns)
+          , var.covar(train_df,column, "versicolor",func_columns))
   }) 
   
+  #Array with delta values for "virginica"
+   virginica <- sapply(1:ncol(test_df),function(i){
+    delta(test_df[,i], apriori(train_df,column,"virginica"), 
+          media(train_df,column,"virginica",func_columns)
+          , var.covar(train_df,column, "virginica",func_columns))
+  }) 
   
- 
-  x<-tibble("setosa"=setosa,"versicolor"=versicolor,"virginica"=virginica)
+  #Table with delta values for each element
+  df<-tibble("setosa"=setosa,"versicolor"=versicolor,"virginica"=virginica)
+  max_by_row<-data.frame("Prediction" = max.col(df,'first'))
   
-  max_by_row<-data.frame("Predict" = max.col(x,'first'))
-  
-  
-  for (i in 1:length(func_Predict_classes)){
-    max_by_row$Predict[max_by_row$Predict == i]<-func_Predict_classes[i]
+  for (i in 1:length(predict_classes)){
+    max_by_row$Prediction[max_by_row$Prediction == i]<-predict_classes[i]
   }
   
-  df <- cbind(df, max_by_row)
-  return (df)
-  
+  X <- cbind(X, max_by_row)
+  return (X)
 }
-
-#probar la clasificación
-clas<-clasifica(test_data[2:4],train_data)
-clas$Predict==data.frame(iris[-train_ind, ])[5]
-
 ```
 
-## Tarea6
+Probamos la función para sólo una observación. Tomamos los datos originales y los dividimos en: set de entrenamiento *(train_data)*: 80% de los datos, y set de pruebas *(test data)*: 20% de los datos, sin tomar en cuenta la columna *'Species'*.
 
 ```{r}
-#look if jobs 1 to 4 are ok
-# get data
-class.iris <- 'setosa'
-vars.list <- list('Sepal.Width', 'Petal.Length')
-column.data <- 'Species'
-x.setosa <- iris %>% 
-  filter(Species == class.iris) %>% 
-  select(unlist(vars.list)) %>% #get only the vars to apply
-  slice(1L) %>% #get only on observation
-  as.matrix() %>% 
-  t() #column vector
 
-#apriori
-pi.setosa <- apriori(iris, column.data, class.iris)
+smp_size <- floor(0.8 * nrow(iris))
+train_ind <- sample(seq_len(nrow(iris)), size = smp_size)
 
-#mean
-mean.setosa <- media(iris, column.data, class.iris, vars.list)
-
-#var
-var.setosa <- var.covar(iris, column.data, class.iris, vars.list)
-
-#lda
-delta.setosa <- delta(x.setosa, pi.setosa, mean.setosa, var.setosa)
+train_data <- data.frame(iris[train_ind, ])
+test_data <- data.frame(iris[-train_ind, -5])
+test_species <- data.frame(iris[-train_ind, ])
 
 
+
+#Random selection of an element in iris
+single_index <- sample(nrow(iris),1)  
+single_data <- iris[single_index, ]
+single_test <- single_data[,-5] 
+
+#Original data for single prediction
+single_data %>% knitr::kable()
+```
+```{r}
+#LDA classification of single element
+clasifica(single_test,train_data)
+```
+
+
+## Subtarea6: Predicciones y resultados
+En esta sección aplicamos el LDA al set de entrenamiento (20% de los datos de iris) y lo comparamos con las clasificaciones verdaderas.
+
+```{r}
+cl = clasifica(test_data, train_data)
+cl
+```
+Comparamos los resultados originales y las predicciones con una matriz de confusión:
+
+```{r}
+table <- table(test_species$Species, cl$Prediction,
+               dnn = c("Actual", "Predecido"))
+table
+```
+
+En este caso, vemos que, cuando incluimos todas las variables independientes ('Sepal.Length','Sepal.Width','Petal.Length','Petal.Width'), el método es capaz de clasificar fácilmente *Setosa*, pero falla en clasificar entre *Virginica* y *Versicolor*. Los niveles de accuracy, precision, recall y f1-score son:
+
+```{r}
+accuracy_overall <- sum(diag(table))
+precision_overall <- diag(table) / apply(table, 2, sum) 
+recall_overall <- diag(table) / apply(table, 1, sum)
+f1_overall <- 2 * precision_overall * recall_overall / (precision_overall + recall_overall)
+
+  df <- data.frame(precision_overall, recall_overall, f1_overall) %>%
+  rename(Precision = precision_overall,
+         Recall = recall_overall,
+         F1 = f1_overall)
+  df
+```
+
+Finalmente, reduciremos el número de variables independientes a 3 y 2 variables en el set de entrenamiento para ver el desempeño del algoritmo en cada caso
+
+```{r}
+#Testing data reduction
+test_three <- test_data[,-sample(1:4, 1)]
+test_two <- test_three[,-sample(1:3, 1)]
+
+#LDAs
+cl3 <- clasifica(test_three,train_data)
+cl2 <- clasifica(test_two,train_data)
 
 ```
 
- es que para cada clase, la matriz de varianzas y covarianzas es la misma, i.e. $\Sigma_{k} = \Sigma \quad \forall i = 1,2,3$. Este es el supuesto que vuelve lineal el discriminante.
+La matriz de confusión para 3 variables independientes es:
+
+```{r}
+table3 <- table(test_species$Species, cl3$Prediction,
+               dnn = c("Actual", "Predecido"))
+table3
+
+```
+
+Y sus métricas de desempeño son:
+
+```{r}
+accuracy_3 <- sum(diag(table3))
+precision_3 <- diag(table3) / apply(table3, 2, sum) 
+recall_3 <- diag(table3) / apply(table3, 1, sum)
+f1_3 <- 2 * precision_3 * recall_3 / (precision_3 + recall_3)
+
+  df3 <- data.frame(precision_3, recall_3, f1_3) %>%
+  rename(Precision = precision_3,
+         Recall = recall_3,
+         F1 = f1_3)
+
+```
+
+La matriz de confusión para 2 variables independientes es:
+
+```{r}
+table2 <- table(test_species$Species, cl2$Prediction,
+               dnn = c("Actual", "Predecido"))
+table2
+
+```
+
+Y sus métricas son:
+
+```{r}
+accuracy_2 <-  sum(diag(table2))
+precision_2 <- diag(table2) / apply(table2, 2, sum) 
+recall_2 <- diag(table2) / apply(table2, 1, sum)
+f1_2 <- 2 * precision_2 * recall_2 / (precision_2 + recall_2)
+
+  df2 <- data.frame(precision_2, recall_2, f1_2) %>%
+  rename(Precision = precision_2,
+         Recall = recall_2,
+         F1 = f1_2)
+
+```
+## Conclusión
+
+En general, el LDA se desempeñó de manera consistente, independientemente del número de variables que se consideraron para el set de prueba. En los tres casos, los thresholds para **precision**, **recall** y **f1** nunca fueron más bajos que **`r min(min(df[,1]), min(df3[,1]), min(df2[,1]))`**, **`r min(min(df[,2]), min(df3[,2]), min(df2[,2]))`** y **`r min(min(df[,3]), min(df3[,3]), min(df2[,3]))`**,  correspondientemente.
+
+
+
 
