@@ -279,7 +279,7 @@ f1_2 <- 2 * precision_2 * recall_2 / (precision_2 + recall_2)
 ```
 ## Conclusión
 
-En general, el LDA se desempeñó de manera consistente, independientemente del número de variables que se consideraron para el set de prueba. En los tres casos, los thresholds para **precision**, **recall** y **f1** nunca fueron más bajos que **`r min(min(df[,1]), min(df3[,1]), min(df2[,1]))`**, **`r min(min(df[,2]), min(df3[,2]), min(df2[,2]))`** y **`r min(min(df[,3]), min(df3[,3]), min(df2[,3]))`**,  correspondientemente. Viendo que al utilizar las variables Petal.Length y Petal.Width tenemos una precisión del **`r 1-(4/30)`** que son las que más tienen un valor en la predicción.
+En general, el LDA se desempeñó de manera consistente, independientemente del número de variables que se consideraron para el set de prueba. En los tres casos, los thresholds para **precision**, **recall** y **f1** nunca fueron más bajos que **`r min(min(df[,1]), min(df3[,1]), min(df2[,1]))`**, **`r min(min(df[,2]), min(df3[,2]), min(df2[,2]))`** y **`r min(min(df[,3]), min(df3[,3]), min(df2[,3]))`**,  correspondientemente. 
 
 
 
