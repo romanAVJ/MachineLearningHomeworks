@@ -1,7 +1,8 @@
 ---
 title: 'Tarea1: LDA'
-subtitle: Román Alverto Vélez Jiménez CU 165462,
-          Iván Alvarez Tostado CU 167699  
+subtitle: Román Alverto Vélez Jiménez,
+          Iván Alvarez Tostado,
+          Diego Villegas Juárez 
 output:
   html_document:
     df_print: paged
@@ -215,12 +216,12 @@ f1_overall <- 2 * precision_overall * recall_overall / (precision_overall + reca
   df
 ```
 
-Finalmente, reduciremos el número de variables independientes a 3 y 2 variables en el set de entrenamiento para ver el desempeño del algoritmo en cada caso
+Finalmente, reduciremos el número de variables independientes a 3 y 2 variables en el set de entrenamiento para ver el desempeño del algoritmo en cada caso. Utilizando las variables Petal.Length y Petal.Width para un caso, junto con Sepal.Width, Petal.Length yPetal.Width para el otro.
 
 ```{r}
 #Testing data reduction
-test_three <- test_data[,-sample(1:4, 1)]
-test_two <- test_three[,-sample(1:3, 1)]
+test_three <- test_data[,2:4]
+test_two <- test_three[,2:3]
 
 #LDAs
 cl3 <- clasifica(test_three,train_data)
@@ -277,7 +278,128 @@ f1_2 <- 2 * precision_2 * recall_2 / (precision_2 + recall_2)
 ```
 ## Conclusión
 
-En general, el LDA se desempeñó de manera consistente, independientemente del número de variables que se consideraron para el set de prueba. En los tres casos, los thresholds para **precision**, **recall** y **f1** nunca fueron más bajos que **`r min(min(df[,1]), min(df3[,1]), min(df2[,1]))`**, **`r min(min(df[,2]), min(df3[,2]), min(df2[,2]))`** y **`r min(min(df[,3]), min(df3[,3]), min(df2[,3]))`**,  correspondientemente.
+En general, el LDA se desempeñó de manera consistente, independientemente del número de variables que se consideraron para el set de prueba. En los tres casos, los thresholds para **precision**, **recall** y **f1** nunca fueron más bajos que **`r min(min(df[,1]), min(df3[,1]), min(df2[,1]))`**, **`r min(min(df[,2]), min(df3[,2]), min(df2[,2]))`** y **`r min(min(df[,3]), min(df3[,3]), min(df2[,3]))`**,  correspondientemente. Viendo que al utilizar las variables Petal.Length y Petal.Width tenemos una precisión del **`r 1-(4/30)`** que son las que más tienen un valor en la predicción.
+
+# Modelo Multivariado
+Para este caso calculamos las funciones Mult_apriori, Mult_media, Mult_var.covar, Mult_delta y Mult_clasifica, que son muy similares al modelo univariado.
+
+## Subtarea 1: Probabilidades a priori de las clases
+
+
+```{r function_Mult_apriori}
+Mult_apriori<-function(train_data_frame, Column_Class, Class){
+  
+  funct_df<-train_data[Column_Class] %>% 
+    rename(Column_1=Column_Class)
+  n_1<-funct_df %>%
+    filter(Column_1==Class) %>% 
+    count()
+  n_2<-funct_df %>% 
+    count()
+  return(n_1/n_2)
+  
+}
+
+```
+
+
+## Subtarea2: Estimación de la media
+
+```{r function_Mult_media}
+Mult_media<-function(train_data_frame, Column_Class, Class,Column_Ind_Var){
+  
+  funct_df<-train_data_frame[c(Column_Ind_Var,Column_Class)] %>% 
+    rename(Column_1=Column_Class) %>% 
+    filter(Column_1==Class) %>% 
+    dplyr::select(Column_Ind_Var) %>% 
+    summarise_if(is.numeric, mean)
+  return(funct_df)
+}
+
+
+```
+
+## Subtarea3: Estimación de la covarianza
+
+
+```{r}
+Mult_var.covar<-function(train_data_frame, Column_Class, Class,Column_Ind_Var){
+  
+  funct_df<-train_data_frame[c(Column_Ind_Var,Column_Class)] %>% 
+    rename(Column_1=Column_Class) %>% 
+    #filter(Column_1==Class) %>% (aquí en la tarea menciona filtrar por clase pero en el libro menciona que es de todas las clases esa es mi duda)
+    dplyr::select(Column_Ind_Var)
+  return(cov(funct_df))
+}
+
+
+
+```
+
+## Subtarea4: Discriminante lineal
+
+
+```{r}
+Mult_delta<-function(func_test_data, func_apriori, func_mean, func_var){
+  x<-as.matrix(func_test_data)
+  f_apri <- as.vector(func_apriori)
+  f_mean <- as.matrix(func_mean)
+  f_var<-solve(as.matrix(func_var))
+  return ((x%*%f_var%*%t(f_mean))-as.numeric((((f_mean %*% f_var)%*%t(f_mean))/2)+log(f_apri)))
+  
+}
+
+```
+
+## Subtarea5: Clasificación de observaciones
+
+```{r, warning=FALSE, error=FALSE}
+Mult_clasifica<-function(func_test_data, train_data){
+  
+  func_columns<-c(names(func_test_data))
+  Predict_var <- "Species"
+  func_Predict_classes <- c("setosa","versicolor","virginica")
+  
+  setosa <- Mult_delta(func_test_data,Mult_apriori(train_data,Predict_var, "setosa"),Mult_media(train_data,Predict_var, "setosa",func_columns),Mult_var.covar(train_data,Predict_var, "setosa",func_columns))
+  versicolor <- Mult_delta(func_test_data,Mult_apriori(train_data,Predict_var, "versicolor"),Mult_media(train_data,Predict_var, "versicolor",func_columns),Mult_var.covar(train_data,Predict_var, "versicolor",func_columns))
+  virginica<- Mult_delta(func_test_data,Mult_apriori(train_data,Predict_var, "virginica"),Mult_media(train_data,Predict_var, "virginica",func_columns),Mult_var.covar(train_data,Predict_var, "virginica",func_columns))
+  
+  x<-tibble("setosa"=setosa,"versicolor"=versicolor,"virginica"=virginica)
+  
+  max_by_row<-data.frame("Predict" = max.col(x,'first'))
+  for (i in 1:length(func_Predict_classes)){
+    max_by_row$Predict[max_by_row$Predict == i]<-func_Predict_classes[i]
+  }
+  
+  func_test_data <- cbind(func_test_data, max_by_row)
+  return (func_test_data)
+  
+}
+
+clas<-Mult_clasifica(test_data, train_data)
+clas
+```
+
+
+## Subtarea6: Predicciones y resultados Multivariados
+En esta sección aplicamos el LDA al set de entrenamiento (20% de los datos de iris) y lo comparamos con las clasificaciones verdaderas solamente para las variables de Petal.Length Petal.Width. Utilizando el método multivariado.
+
+```{r}
+cl_Mult = Mult_clasifica(test_data[3:4], train_data)
+cl_Mult
+```
+Comparamos los resultados originales y las predicciones con una matriz de confusión:
+
+```{r}
+table <- table(test_species$Species, cl_Mult$Predict,
+               dnn = c("Actual", "Predecido"))
+table
+```
+
+En este caso, vemos que, cuando incluimos las variables independientes 'Petal.Length','Petal.Width'), el método es capaz de clasificar fácilmente *Setosa*, pero solamente falla en una clasificación, teniendo una estimación de mas del **`r 1-(1/30)`**
+
+
+
 
 
 
