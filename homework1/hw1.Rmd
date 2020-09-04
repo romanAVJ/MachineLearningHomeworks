@@ -79,10 +79,8 @@ $$S_n = \frac{1}{n-1}\sum_{i=1}^{n}(x_i - \bar x)'(x_{i}- \bar x)$$
 var.covar <- function(df, column, class.name, vars.list){
   # get only the data of the class to estimate
   vars.vec <- unlist(vars.list)
-  df.class <- df[df[,column] == class.name,]
-  df.class <- df.class[,vars.vec]
-  df.class <- df[,vars.vec]
-  
+  df.class <- df[df[,column] == class.name, vars.vec]
+
   # get variance
   Sn <- cov(df.class)
   Sn <- as.matrix(Sn)
@@ -96,7 +94,6 @@ var.covar <- function(df, column, class.name, vars.list){
 ## Subtarea4: Discriminante lineal
 En esta tarea, calcularemos
 $$\delta_{k}(x) = x' \Sigma^{-1}\mu_k - \frac{1}{2}\mu_k' \Sigma^{-1} \mu_k + \ln(\pi_k)$$
-
 
 ```{r}
 delta <- function(x, apriori.k, mean.k, var.k){
@@ -113,7 +110,6 @@ Esta función clasifica una o más de una observación y tiene como parámetros 
 
 ```{r}
 clasifica<-function(X,train_df){
-  
   #Check if data is properly given
   if (length(which(grepl(".Length", colnames(X)))) > 0 | 
       length(which(grepl(".Width", colnames(X)))) > 0) {
@@ -125,25 +121,30 @@ clasifica<-function(X,train_df){
   column <- "Species"
   predict_classes <- c("setosa","versicolor","virginica")
   
+  # S pooled (groups of equal sizes)
+  S.pooled <-  (var.covar(train_df,column, "setosa",func_columns) +
+             var.covar(train_df,column, "versicolor",func_columns) +
+             var.covar(train_df,column, "virginica",func_columns)) / length(unique(predict_classes))
+  
   #Array with delta values for "setosa"
     setosa <- sapply(1:ncol(test_df),function(i){
     delta(test_df[,i], apriori(train_df,column,"setosa"), 
           media(train_df,column,"setosa",func_columns)
-          , var.covar(train_df,column, "setosa",func_columns))
+          , S.pooled)
   }) 
     
   #Array with delta values for "versicolor"
    versicolor <- sapply(1:ncol(test_df),function(i){
     delta(test_df[,i], apriori(train_df,column,"versicolor"), 
           media(train_df,column,"versicolor",func_columns)
-          , var.covar(train_df,column, "versicolor",func_columns))
+          , S.pooled)
   }) 
   
   #Array with delta values for "virginica"
    virginica <- sapply(1:ncol(test_df),function(i){
     delta(test_df[,i], apriori(train_df,column,"virginica"), 
           media(train_df,column,"virginica",func_columns)
-          , var.covar(train_df,column, "virginica",func_columns))
+          , S.pooled)
   }) 
   
   #Table with delta values for each element
@@ -279,127 +280,6 @@ f1_2 <- 2 * precision_2 * recall_2 / (precision_2 + recall_2)
 ## Conclusión
 
 En general, el LDA se desempeñó de manera consistente, independientemente del número de variables que se consideraron para el set de prueba. En los tres casos, los thresholds para **precision**, **recall** y **f1** nunca fueron más bajos que **`r min(min(df[,1]), min(df3[,1]), min(df2[,1]))`**, **`r min(min(df[,2]), min(df3[,2]), min(df2[,2]))`** y **`r min(min(df[,3]), min(df3[,3]), min(df2[,3]))`**,  correspondientemente. Viendo que al utilizar las variables Petal.Length y Petal.Width tenemos una precisión del **`r 1-(4/30)`** que son las que más tienen un valor en la predicción.
-
-# Modelo Multivariado
-Para este caso calculamos las funciones Mult_apriori, Mult_media, Mult_var.covar, Mult_delta y Mult_clasifica, que son muy similares al modelo univariado.
-
-## Subtarea 1: Probabilidades a priori de las clases
-
-
-```{r function_Mult_apriori}
-Mult_apriori<-function(train_data_frame, Column_Class, Class){
-  
-  funct_df<-train_data[Column_Class] %>% 
-    rename(Column_1=Column_Class)
-  n_1<-funct_df %>%
-    filter(Column_1==Class) %>% 
-    count()
-  n_2<-funct_df %>% 
-    count()
-  return(n_1/n_2)
-  
-}
-
-```
-
-
-## Subtarea2: Estimación de la media
-
-```{r function_Mult_media}
-Mult_media<-function(train_data_frame, Column_Class, Class,Column_Ind_Var){
-  
-  funct_df<-train_data_frame[c(Column_Ind_Var,Column_Class)] %>% 
-    rename(Column_1=Column_Class) %>% 
-    filter(Column_1==Class) %>% 
-    dplyr::select(Column_Ind_Var) %>% 
-    summarise_if(is.numeric, mean)
-  return(funct_df)
-}
-
-
-```
-
-## Subtarea3: Estimación de la covarianza
-
-
-```{r}
-Mult_var.covar<-function(train_data_frame, Column_Class, Class,Column_Ind_Var){
-  
-  funct_df<-train_data_frame[c(Column_Ind_Var,Column_Class)] %>% 
-    rename(Column_1=Column_Class) %>% 
-    #filter(Column_1==Class) %>% (aquí en la tarea menciona filtrar por clase pero en el libro menciona que es de todas las clases esa es mi duda)
-    dplyr::select(Column_Ind_Var)
-  return(cov(funct_df))
-}
-
-
-
-```
-
-## Subtarea4: Discriminante lineal
-
-
-```{r}
-Mult_delta<-function(func_test_data, func_apriori, func_mean, func_var){
-  x<-as.matrix(func_test_data)
-  f_apri <- as.vector(func_apriori)
-  f_mean <- as.matrix(func_mean)
-  f_var<-solve(as.matrix(func_var))
-  return ((x%*%f_var%*%t(f_mean))-as.numeric((((f_mean %*% f_var)%*%t(f_mean))/2)+log(f_apri)))
-  
-}
-
-```
-
-## Subtarea5: Clasificación de observaciones
-
-```{r, warning=FALSE, error=FALSE}
-Mult_clasifica<-function(func_test_data, train_data){
-  
-  func_columns<-c(names(func_test_data))
-  Predict_var <- "Species"
-  func_Predict_classes <- c("setosa","versicolor","virginica")
-  
-  setosa <- Mult_delta(func_test_data,Mult_apriori(train_data,Predict_var, "setosa"),Mult_media(train_data,Predict_var, "setosa",func_columns),Mult_var.covar(train_data,Predict_var, "setosa",func_columns))
-  versicolor <- Mult_delta(func_test_data,Mult_apriori(train_data,Predict_var, "versicolor"),Mult_media(train_data,Predict_var, "versicolor",func_columns),Mult_var.covar(train_data,Predict_var, "versicolor",func_columns))
-  virginica<- Mult_delta(func_test_data,Mult_apriori(train_data,Predict_var, "virginica"),Mult_media(train_data,Predict_var, "virginica",func_columns),Mult_var.covar(train_data,Predict_var, "virginica",func_columns))
-  
-  x<-tibble("setosa"=setosa,"versicolor"=versicolor,"virginica"=virginica)
-  
-  max_by_row<-data.frame("Predict" = max.col(x,'first'))
-  for (i in 1:length(func_Predict_classes)){
-    max_by_row$Predict[max_by_row$Predict == i]<-func_Predict_classes[i]
-  }
-  
-  func_test_data <- cbind(func_test_data, max_by_row)
-  return (func_test_data)
-  
-}
-
-clas<-Mult_clasifica(test_data, train_data)
-clas
-```
-
-
-## Subtarea6: Predicciones y resultados Multivariados
-En esta sección aplicamos el LDA al set de entrenamiento (20% de los datos de iris) y lo comparamos con las clasificaciones verdaderas solamente para las variables de Petal.Length Petal.Width. Utilizando el método multivariado.
-
-```{r}
-cl_Mult = Mult_clasifica(test_data[3:4], train_data)
-cl_Mult
-```
-Comparamos los resultados originales y las predicciones con una matriz de confusión:
-
-```{r}
-table <- table(test_species$Species, cl_Mult$Predict,
-               dnn = c("Actual", "Predecido"))
-table
-```
-
-En este caso, vemos que, cuando incluimos las variables independientes 'Petal.Length','Petal.Width'), el método es capaz de clasificar fácilmente *Setosa*, pero solamente falla en una clasificación, teniendo una estimación de mas del **`r 1-(1/30)`**
-
-
-
 
 
 
