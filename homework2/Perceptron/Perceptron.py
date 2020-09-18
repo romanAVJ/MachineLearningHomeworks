@@ -13,7 +13,6 @@ def perceptron(x_vectors, y_vectors):
             break
 
         salida_rapida = True
-        print(t)
         for i in range(len(x_vectors)):
             if y_vectors[i] * (np.dot(theta[k], x_vectors[i]) + theta_cero[k]) <= 0:
                 theta = np.vstack((theta, theta[k] + y_vectors[i] * x_vectors[i]))
